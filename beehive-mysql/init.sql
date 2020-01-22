@@ -117,5 +117,6 @@ CREATE TABLE IF NOT EXISTS waggle.nodes (
     location            VARCHAR(255),
     opmode              VARCHAR(64) DEFAULT 'testing',
     groups              VARCHAR(128) DEFAULT '',
-    last_updated        TIMESTAMP
+    last_updated        TIMESTAMP,
+	iccid               VARCHAR(255)   # added for backwards-compatibility
 );
