@@ -7,22 +7,7 @@
             "tags": "administrator"
         },
         {
-            "name": "node",
-            "password": "waggle",
-            "tags": ""
-        },
-        {
-            "name": "server",
-            "password": "waggle",
-            "tags": ""
-        },
-        {
-            "name": "router",
-            "password": "router",
-            "tags": ""
-        },
-        {
-            "name": "loader_raw",
+            "name": "service_user",
             "password": "waggle",
             "tags": ""
         }
@@ -41,39 +26,18 @@
             "read": ".*"
         },
         {
-            "user": "node",
-            "vhost": "/",
-            "configure": "pull-images",
-            "write": ".*",
-            "read": "pull-images"
-        },
-        {
-            "user": "server",
+            "user": "service_user",
             "vhost": "/",
             "configure": ".*",
             "write": ".*",
             "read": ".*"
-        },
-        {
-            "user": "router",
-            "vhost": "/",
-            "configure": ".*",
-            "write": ".*",
-            "read": ".*"
-        },
-        {
-            "user": "loader_raw",
-            "vhost": "/",
-            "configure": "^db-raw$",
-            "write": "^db-raw$",
-            "read": "^db-raw$"
         }
     ],
     "parameters": [],
     "policies": [],
     "queues": [
         {
-            "name": "db-raw",
+            "name": "sensor-out",
             "vhost": "/",
             "durable": true,
             "auto_delete": false,
@@ -85,72 +49,11 @@
             "durable": true,
             "auto_delete": false,
             "arguments": {}
-        },
-        {
-            "name": "to-node-0000000000000000",
-            "vhost": "/",
-            "durable": true,
-            "auto_delete": false,
-            "arguments": {}
         }
     ],
     "exchanges": [
         {
-            "name": "data-pipeline-in",
-            "vhost": "/",
-            "type": "fanout",
-            "durable": true,
-            "auto_delete": false,
-            "internal": false,
-            "arguments": {}
-        },
-        {
             "name": "messages",
-            "vhost": "/",
-            "type": "topic",
-            "durable": true,
-            "auto_delete": false,
-            "internal": false,
-            "arguments": {}
-        },
-        {
-            "name": "images",
-            "vhost": "/",
-            "type": "fanout",
-            "durable": true,
-            "auto_delete": false,
-            "internal": false,
-            "arguments": {}
-        },
-        {
-            "name": "logs",
-            "vhost": "/",
-            "type": "fanout",
-            "durable": true,
-            "auto_delete": false,
-            "internal": false,
-            "arguments": {}
-        },
-        {
-            "name": "plugins-in",
-            "vhost": "/",
-            "type": "direct",
-            "durable": true,
-            "auto_delete": false,
-            "internal": false,
-            "arguments": {}
-        },
-        {
-            "name": "data",
-            "vhost": "/",
-            "type": "fanout",
-            "durable": true,
-            "auto_delete": false,
-            "internal": false,
-            "arguments": {}
-        },
-        {
-            "name": "to-nodes",
             "vhost": "/",
             "type": "topic",
             "durable": true,
@@ -161,35 +64,11 @@
     ],
     "bindings": [
         {
-            "source": "data-pipeline-in",
-            "vhost": "/",
-            "destination": "db-raw",
-            "destination_type": "queue",
-            "routing_key": "db-raw",
-            "arguments": {}
-        },
-        {
             "source": "messages",
             "vhost": "/",
             "destination": "to-router",
             "destination_type": "queue",
             "routing_key": "#",
-            "arguments": {}
-        },
-        {
-            "source": "messages",
-            "vhost": "/",
-            "destination": "to-nodes",
-            "destination_type": "exchange",
-            "routing_key": "*.#",
-            "arguments": {}
-        },
-        {
-            "source": "to-nodes",
-            "vhost": "/",
-            "destination": "to-node-0000000000000000",
-            "destination_type": "queue",
-            "routing_key": "0000000000000000.#",
             "arguments": {}
         }
     ]

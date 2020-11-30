@@ -5,7 +5,7 @@
 #           http://www.wa8.gl
 # ANL:waggle-license
 
-FROM rabbitmq:3.5.7
+FROM rabbitmq:3.8.9
 
 ADD configs/enabled_plugins /etc/rabbitmq/enabled_plugins
 ADD configs/rabbitmq.config /etc/rabbitmq/rabbitmq.config

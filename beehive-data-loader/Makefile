@@ -19,4 +19,4 @@ deploy: startnetwork rm
 		--restart=always \
 		--name $(name) \
 		$(image) \
-		python data-loader.py --url amqp://router:router@$(RABBITMQ_HOST) 0000000000000000
+		python data-loader.py --url amqp://service_user:waggle@$(RABBITMQ_HOST) 0000000000000000
