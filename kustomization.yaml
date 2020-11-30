@@ -1,0 +1,17 @@
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+
+resources:
+  - beehive-rabbitmq/deployment.yaml
+
+
+configMapGenerator:
+- name: rabbitmq-config
+  files:
+    # configfile is used as key
+    - definitions=beehive-rabbitmq/configs/definitions.json
+    - enabled_plugins=beehive-rabbitmq/configs/enabled_plugins
+    - config=beehive-rabbitmq/configs/rabbitmq.config
+    

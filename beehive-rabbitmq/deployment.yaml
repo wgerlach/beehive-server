@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq-server
+spec:
+  selector:
+    matchLabels:
+      app: rabbitmq-server
+  template:
+    metadata:
+      labels:
+        app: rabbitmq-server
+    spec:
+      containers:
+      - name: rabbitmq-server
+        image: rabbitmq:3.8.9
+        ports:
+          - containerPort: 5671  # SSL
+          - containerPort: 5672  # non-SSL
+          - containerPort: 15672
+        #envFrom:
+        #- configMapRef:
+        #    name: waggle-config
+        volumeMounts:
+        #- name: waggle-secret
+        #  mountPath: /etc/waggle
+        #  readOnly: true
+          - name: config-volume
+            mountPath: /etc/rabbitmq
+      volumes:
+        - name: config-volume
+          configMap:
+            name: rabbitmq-config
+        #- name: waggle-secret
+        #  secret:
+        #    secretName: waggle-secret
