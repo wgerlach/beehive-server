@@ -13,3 +13,5 @@ __pycache__/
 /beehive-nginx/includes/*.whitelist
 
 data/
+
+#/ansible/private/
