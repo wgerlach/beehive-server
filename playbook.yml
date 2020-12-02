@@ -1,0 +1,279 @@
+
+
+- name: beehive
+  hosts: all
+  become: yes
+  #remote_user: root
+
+  vars:
+    REGISTRATION_VERSION: 2.1.1
+    REGISTRATION_SHA1: 1097639
+    REGISTRATION_BUILD_ID: "local"
+
+    REV_TUNNEL_VERSION: 2.1.1
+    REV_TUNNEL_SHA1: 1097639
+    REV_TUNNEL_BUILD_ID: "local"
+    
+
+  tasks:
+  - name: apt-get update
+    apt:
+      update_cache: yes
+  - name: Ensure a locale exists
+    community.general.locale_gen:
+      name: en_US.UTF-8
+      state: present
+
+
+  - name: Install ubuntu packages
+    apt:
+      name:
+        - systemd
+        - python3
+        - python3-pip
+
+        #- systemd-sysv=245.4-4ubuntu3.3  # is that a good idea? what if another version comes pre-installed ??
+        #- python3=3.8.2-0ubuntu2
+        #- python3-pip=20.0.2-5ubuntu1.1
+        #- python3-venv=3.8.2-0ubuntu2  # what package needs this ?
+
+        #- ansible  # maybe needed if we run asyncronous (long-running) playbooks locally
+        #- dnsmasq (rpi dhcp / pxe booting)
+        #- network-manager
+        #- nfs-kernel-server (rpi nfs)
+        #- openssh-server
+        #- rsyslog
+
+
+      state: present
+
+  
+
+  - name: Create directory /etc/waggle/
+    file:
+      path: /etc/waggle/
+      state: directory
+  
+
+ 
+  - name: Download waggle-registration service
+    get_url:
+       url: "https://github.com/waggle-sensor/beekeeper-registration/releases/download/v{{REGISTRATION_VERSION}}/sagebk-registration_{{REGISTRATION_VERSION}}.{{REGISTRATION_BUILD_ID}}-{{REGISTRATION_SHA1}}_all.deb"
+       dest: "/tmp/sagebk-registration_{{REGISTRATION_VERSION}}.{{REGISTRATION_BUILD_ID}}-{{REGISTRATION_SHA1}}_all.deb"
+  
+  - name: Install waggle-registration service
+    apt:
+      deb: "/tmp/sagebk-registration_{{REGISTRATION_VERSION}}.{{REGISTRATION_BUILD_ID}}-{{REGISTRATION_SHA1}}_all.deb"
+
+  - name: Download waggle-reverse-tunnel service
+    get_url:
+       url: "https://github.com/waggle-sensor/beekeeper-registration/releases/download/v{{REV_TUNNEL_VERSION}}/sagebk-reverse-tunnel_{{REV_TUNNEL_VERSION}}.{{REV_TUNNEL_BUILD_ID}}-{{REV_TUNNEL_SHA1}}_all.deb"
+       dest: "/tmp/sagebk-reverse-tunnel_{{REV_TUNNEL_VERSION}}.{{REV_TUNNEL_BUILD_ID}}-{{REV_TUNNEL_SHA1}}_all.deb"
+
+  - name: Install waggle-reverse-tunnel service
+    apt:
+      deb: "/tmp/sagebk-reverse-tunnel_{{REV_TUNNEL_VERSION}}.{{REV_TUNNEL_BUILD_ID}}-{{REV_TUNNEL_SHA1}}_all.deb"
+  
+  # TODO remove (this should be in debian package)
+  - name: install kubernetes python lib for sagebk-registration
+    pip: 
+      name: kubernetes==12.0.1
+
+
+  # TODO remove
+  - name: Get latest sagebk-registration (for testing purposes)
+    get_url:
+      url: https://raw.githubusercontent.com/wgerlach/beekeeper-registration/master/ROOTFS/usr/bin/sagebk-registration
+      dest: /usr/bin/sagebk-registration
+      mode: '0755'
+      force: yes
+
+  # TODO remove
+  - name: Get latest sagebk-reverse-tunnel (for testing purposes)
+    get_url:
+      url: https://raw.githubusercontent.com/wgerlach/beekeeper-registration/master/ROOTFS/usr/bin/sagebk-reverse-tunnel
+      dest: /usr/bin/sagebk-reverse-tunnel
+      mode: '0755'
+      force: yes
+
+  # TODO remove
+  - name: Restart sagebk-registration.service
+    systemd:
+      state: restarted
+      name: sagebk-registration.service
+
+  # TODO remove
+  - name: Restart sagebk-reverse-tunnel.service
+    systemd:
+      state: restarted
+      name: sagebk-reverse-tunnel.service
+
+
+
+  - name: waggle-list-services
+    copy:
+      dest: "/usr/local/bin/waggle-list-services"
+      owner: root
+      group: root
+      mode: '0755'
+      content: |
+        #!/bin/sh
+        systemctl list-units -t service --full --all --plain --no-legend | grep '^\(sage\|waggle\)'
+
+
+
+- name: install k3s
+  hosts: all
+  become: yes
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+  # https://github.com/rancher/k3s-ansible
+
+  tasks:
+    - name: install k3s
+      args:
+        warn: false  # ansible is unhappy about curl
+      shell: curl -sfL https://get.k3s.io | sh -
+      
+
+    #- name: copy kubernetes resource files to node
+    #  copy:
+    #    # ansible expects files in subfolder "files" (which does not exist), but we can get outside using "../"
+    #    src: ../kubernetes
+    #    dest: /opt/sage/
+
+- name: install k3s
+  hosts: all
+  become: yes
+  
+  tasks:
+    - name: set timezone variable if defined
+      set_fact:
+        timezone_internal: "{{timezone}}"
+      when: timezone is defined
+
+    - name: set timezone
+      timezone:
+        name: "{{timezone_internal}}"
+      when: timezone_internal != "none"
+    
+    - fail: 
+        msg: "Bailing out: this play requires variable 'beekeeper_registration_host'"
+      when: beekeeper_registration_host is not defined
+
+    - fail: 
+        msg: "Bailing out: this play requires variable 'beekeeper_registration_port'"
+      when: beekeeper_registration_port is not defined
+    
+
+      # TODO decide which part of config belongs in which playbook
+    - name: config
+      copy:
+        dest: "/etc/waggle/config.ini"
+        content: |
+          # WARNING: Do not edit this file directly, this file is written by an ansible playbook
+          [system]
+          devmode = true
+
+          # by default this should be generated from the mac-address of the network device
+          # e.g. 0000000000000001
+          node-id-override = {{node_id}} 
+          
+          [registration]
+          host={{beekeeper_registration_host}}
+          port={{beekeeper_registration_port}}
+          user=sage_registration
+
+          [hardware]
+          # use network-interface if default does not work
+          # e.g. enp0s3 , eth0
+          # network-interface = {{ ansible_default_ipv4.interface }}
+   
+    - name: check private/register.pem-cert.pub
+      become: no
+      local_action: stat path=private/register.pem-cert.pub
+      register: register_cert
+
+    - name: Copy register.pem-cert.pub if exists
+      copy:
+        src: private/register.pem-cert.pub
+        dest: /etc/waggle/sage_registration-cert.pub
+        owner: root
+        group: root
+        mode: '0644'
+      when: register_cert.stat.exists
+    
+    - name: check private/register.pem
+      become: no
+      local_action: stat path=private/register.pem
+      register: register_pem
+
+    - name: Copy register.pem if exists
+      copy:
+        src: private/register.pem
+        dest: /etc/waggle/sage_registration
+        owner: root
+        group: root
+        mode: '0600'
+      when: register_pem.stat.exists
+
+    - name: check private/known_hosts
+      become: no
+      local_action: stat path=private/known_hosts
+      register: known_hosts
+
+    # TODO this may not be ideal as it would overwrite an existing file
+    - name: Copy known_hosts if exists
+      copy:
+        src: private/known_hosts
+        dest: /etc/ssh/ssh_known_hosts
+        owner: root
+        group: root
+        mode: '0644'
+      when: known_hosts.stat.exists
+
+
+    - name: Make sure k3s is running
+      systemd:
+        state: started
+        name: k3s
+
+    # speed-up, otherwise have to wait up to 3 minutes
+    - name: Restart sagebk-registration.service
+      systemd:
+        state: restarted
+        name: sagebk-registration.service
+
+    # speed-up, otherwise have to wait up to 3 minute
+    - name: Restart sagebk-reverse-tunnel.service
+      systemd:
+        state: restarted
+        name: sagebk-reverse-tunnel.service
+
+
+    - name: Wait for nodes to be ready
+      shell: "kubectl get nodes"
+      register: nodes
+      until:      
+        - '" Ready "  in nodes.stdout'      
+      retries: 20
+      delay: 2
+
+    - name: Creates directory
+      file:
+        path: /opt/sage/kubernetes
+        state: directory
+
+    #- name: Ansible copy file to remote server
+    #  copy:
+    #    # ansible expects files in subfolder "files" (which does not exist), but we can get outside using "../"
+    #    src: ../kubernetes
+    #    dest: /opt/sage/
+
+
+    #- name: load kubernetes resources
+    #  command: kubectl apply -k /opt/sage/kubernetes/    
+     
+        
+        
